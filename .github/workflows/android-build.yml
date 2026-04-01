@@ -9,16 +9,16 @@ jobs:
 
     steps:
       - name: Show environment
-        shell: powershell
+        shell: cmd
         run: |
-          wsl -d Ubuntu bash --noprofile --norc -c "uname -a && cd ~/src/oom-build-tools && pwd"
+          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "uname -a && cd ~/src/oom-build-tools && pwd"
 
       - name: Pull latest scripts repo
-        shell: powershell
+        shell: cmd
         run: |
-          wsl -d Ubuntu bash --noprofile --norc -c "cd ~/src/oom-build-tools && git pull --ff-only"
+          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "cd ~/src/oom-build-tools && git pull --ff-only"
 
       - name: Run OOM Android build
-        shell: powershell
+        shell: cmd
         run: |
-          wsl -d Ubuntu bash --noprofile --norc -c "cd ~/src/oom-build-tools && ./oom-run.sh"
+          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "cd ~/src/oom-build-tools && ./oom-run.sh"
