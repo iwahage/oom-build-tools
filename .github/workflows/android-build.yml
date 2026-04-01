@@ -9,16 +9,16 @@ jobs:
 
     steps:
       - name: Show environment
-        shell: cmd
+        shell: powershell
         run: |
           wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "uname -a && cd ~/src/oom-build-tools && pwd"
 
       - name: Pull latest scripts repo
-        shell: cmd
+        shell: powershell
         run: |
           wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "cd ~/src/oom-build-tools && git pull --ff-only"
 
       - name: Run OOM Android build
-        shell: cmd
+        shell: powershell
         run: |
           wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "cd ~/src/oom-build-tools && ./oom-run.sh"
