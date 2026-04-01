@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source /home/yutaro/src/scripts/oom-env.sh
+cd "$HOME/src/superbuild/build-android"
+source "$HOME/src/scripts/oom-env.sh"
 
-cd /home/yutaro/src/superbuild/build-android
+echo "== Build libkml first =="
+gmake -j1 libkml-1.3.0-9-aarch64-linux-android
 
-cmake --build . \
-  --target openorienteering-mapper-git-master-aarch64-linux-android-package \
-  -j1 2>&1 | tee /home/yutaro/src/logs/oom-build-$(date +%Y%m%d-%H%M%S).log
+echo "== Fix libkml export files =="
+"$HOME/src/scripts/oom-fix-libkml.sh"
+
+echo "== Build OOM Android package =="
+gmake -j1 openorienteering-mapper-git-master-aarch64-linux-android-package
