@@ -5,20 +5,20 @@ on:
 
 jobs:
   build:
-    runs-on: [self-hosted, windows, x64]
+    runs-on: [self-hosted, Windows, X64]
 
     steps:
       - name: Show environment
         shell: powershell
         run: |
-          wsl bash -lc "uname -a && cd ~/src/oom-build-tools && pwd"
+          wsl -d Ubuntu bash --noprofile --norc -c "uname -a && cd ~/src/oom-build-tools && pwd"
 
       - name: Pull latest scripts repo
         shell: powershell
         run: |
-          wsl bash -lc "cd ~/src/oom-build-tools && git pull --ff-only"
+          wsl -d Ubuntu bash --noprofile --norc -c "cd ~/src/oom-build-tools && git pull --ff-only"
 
       - name: Run OOM Android build
         shell: powershell
         run: |
-          wsl bash -lc "cd ~/src/oom-build-tools && ~/src/scripts/oom-run.sh"
+          wsl -d Ubuntu bash --noprofile --norc -c "cd ~/src/oom-build-tools && ./oom-run.sh"
