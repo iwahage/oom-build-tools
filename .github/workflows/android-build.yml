@@ -1,17 +1,47 @@
+name: OOM Android Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: [self-hosted, Windows, X64]
+
+    steps:
+      - name: Prepare artifact folder
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path C:\actions-artifacts\current | Out-Null
+          Remove-Item -Force C:\actions-artifacts\current\* -ErrorAction SilentlyContinue
+
+      - name: Show environment
+        shell: powershell
+        run: |
+          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "uname -a && whoami && cd ~/src/oom-build-tools && pwd"
+
+      - name: Pull latest scripts repo
+        shell: powershell
+        run: |
+          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "cd ~/src/oom-build-tools && git pull --ff-only"
+
       - name: Run OOM Android build
         shell: powershell
         run: |
-          $cmd = @'
-          set -eu
-          OUT_DIR=/mnt/c/actions-artifacts/current
-          mkdir -p "$OUT_DIR"
-          cd ~/src/oom-build-tools
-          ./oom-run.sh 2>&1 | tee "$OUT_DIR/build.log"
-          status=${PIPESTATUS[0]}
-          if [ $status -ne 0 ]; then
-            exit $status
-          fi
-          cp -f /home/yutaro/src/superbuild/build-android/aarch64-linux-android/openorienteering-mapper-git-master/OpenOrienteering-Mapper-git-master-Android-arm64-v8a.apk "$OUT_DIR/"
-          ls -lah "$OUT_DIR"
-          '@
-          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "$cmd"
+          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "cd ~/src/oom-build-tools && ./oom-run.sh > /mnt/c/actions-artifacts/current/build.log 2>&1"
+
+      - name: Copy APK to artifact folder
+        if: ${{ success() }}
+        shell: powershell
+        run: |
+          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "cp -f /home/yutaro/src/superbuild/build-android/aarch64-linux-android/openorienteering-mapper-git-master/OpenOrienteering-Mapper-git-master-Android-arm64-v8a.apk /mnt/c/actions-artifacts/current/"
+
+      - name: Upload APK and log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: oom-android-apk
+          path: |
+            C:\actions-artifacts\current\*.apk
+            C:\actions-artifacts\current\build.log
+          if-no-files-found: warn
+          retention-days: 14
