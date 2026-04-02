@@ -2,6 +2,12 @@ name: OOM Android Build
 
 on:
   workflow_dispatch:
+    inputs:
+      mapper_ref:
+        description: 'Mapper branch or tag to build'
+        required: true
+        default: 'main'
+        type: string
 
 jobs:
   build:
@@ -21,18 +27,42 @@ jobs:
           $shortSha = $env:GITHUB_SHA.Substring(0,7)
           "BUILD_STAMP=$stamp" >> $env:GITHUB_ENV
           "SHORT_SHA=$shortSha" >> $env:GITHUB_ENV
-          "APK_NAME=OOM-Android-$stamp-$shortSha.apk" >> $env:GITHUB_ENV
-          "LOG_NAME=OOM-Android-$stamp-$shortSha-build.log" >> $env:GITHUB_ENV
+          "MAPPER_REF=${{ inputs.mapper_ref }}" >> $env:GITHUB_ENV
+          "APK_NAME=OOM-Android-${{ inputs.mapper_ref }}-$stamp-$shortSha.apk" >> $env:GITHUB_ENV
+          "LOG_NAME=OOM-Android-${{ inputs.mapper_ref }}-$stamp-$shortSha-build.log" >> $env:GITHUB_ENV
 
       - name: Show environment
         shell: powershell
         run: |
-          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "uname -a && whoami && cd ~/src/oom-build-tools && pwd"
+          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "uname -a && whoami && pwd"
 
-      - name: Pull latest scripts repo
+      - name: Pull latest build-tools repo
         shell: powershell
         run: |
           wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "cd ~/src/oom-build-tools && git pull --ff-only"
+
+      - name: Checkout Mapper branch
+        shell: powershell
+        run: |
+          $cmd = @'
+          set -eu
+          MAPPER_REPO=~/src/mapper
+          TARGET_REF="${{ inputs.mapper_ref }}"
+
+          cd "$MAPPER_REPO"
+          git fetch origin --prune
+
+          if git show-ref --verify --quiet "refs/heads/$TARGET_REF"; then
+            git checkout "$TARGET_REF"
+            git pull --ff-only origin "$TARGET_REF"
+          else
+            git checkout -B "$TARGET_REF" "origin/$TARGET_REF"
+          fi
+
+          git rev-parse --abbrev-ref HEAD
+          git rev-parse --short HEAD
+          '@
+          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "$cmd"
 
       - name: Run OOM Android build
         shell: powershell
@@ -61,12 +91,8 @@ jobs:
           $apkPath = "C:\actions-artifacts\current\$env:APK_NAME"
           $debugKeystore = Join-Path $env:USERPROFILE ".android\debug.keystore"
 
-          if (-not (Test-Path $apkPath)) {
-            throw "APK not found: $apkPath"
-          }
-          if (-not (Test-Path $debugKeystore)) {
-            throw "debug.keystore not found: $debugKeystore"
-          }
+          if (-not (Test-Path $apkPath)) { throw "APK not found: $apkPath" }
+          if (-not (Test-Path $debugKeystore)) { throw "debug.keystore not found: $debugKeystore" }
 
           $buildToolsRoot = Join-Path $env:LOCALAPPDATA "Android\Sdk\build-tools"
           $apksigner = Get-ChildItem $buildToolsRoot -Directory |
@@ -74,10 +100,6 @@ jobs:
             ForEach-Object { Join-Path $_.FullName "apksigner.bat" } |
             Where-Object { Test-Path $_ } |
             Select-Object -First 1
-
-          if (-not $apksigner) {
-            throw "apksigner.bat not found under $buildToolsRoot"
-          }
 
           $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
           $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
@@ -97,7 +119,6 @@ jobs:
         shell: powershell
         run: |
           $apkPath = "C:\actions-artifacts\current\$env:APK_NAME"
-
           $buildToolsRoot = Join-Path $env:LOCALAPPDATA "Android\Sdk\build-tools"
           $apksigner = Get-ChildItem $buildToolsRoot -Directory |
             Sort-Object Name -Descending |
@@ -105,26 +126,16 @@ jobs:
             Where-Object { Test-Path $_ } |
             Select-Object -First 1
 
-          if (-not $apksigner) {
-            throw "apksigner.bat not found under $buildToolsRoot"
-          }
-
           $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
           $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 
           & $apksigner verify --verbose $apkPath
 
-      - name: Show artifact files
-        if: ${{ always() }}
-        shell: powershell
-        run: |
-          Get-ChildItem C:\actions-artifacts\current
-
       - name: Upload APK and log
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: oom-android-apk-${{ env.BUILD_STAMP }}-${{ env.SHORT_SHA }}
+          name: oom-android-apk-${{ inputs.mapper_ref }}-${{ env.BUILD_STAMP }}-${{ env.SHORT_SHA }}
           path: |
             C:\actions-artifacts\current\*.apk
             C:\actions-artifacts\current\*.log
