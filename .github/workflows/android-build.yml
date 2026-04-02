@@ -47,11 +47,72 @@ jobs:
             Rename-Item -Path C:\actions-artifacts\current\build.log -NewName $env:LOG_NAME -Force
           }
 
-      - name: Copy APK to artifact folder
+      - name: Copy unsigned APK to artifact folder
         if: ${{ success() }}
         shell: powershell
         run: |
-          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "cp -f /home/yutaro/src/superbuild/build-android/aarch64-linux-android/openorienteering-mapper-git-master/OpenOrienteering-Mapper-git-master-Android-arm64-v8a.apk /mnt/c/actions-artifacts/current/$env:APK_NAME"
+          $unsigned = "/home/yutaro/src/superbuild/build-android/aarch64-linux-android/openorienteering-mapper-git-master/OpenOrienteering-Mapper-git-master-Android-arm64-v8a.apk"
+          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "cp -f $unsigned /mnt/c/actions-artifacts/current/$env:APK_NAME"
+
+      - name: Sign APK with debug keystore
+        if: ${{ success() }}
+        shell: powershell
+        run: |
+          $apkPath = "C:\actions-artifacts\current\$env:APK_NAME"
+          $debugKeystore = Join-Path $env:USERPROFILE ".android\debug.keystore"
+
+          if (-not (Test-Path $apkPath)) {
+            throw "APK not found: $apkPath"
+          }
+          if (-not (Test-Path $debugKeystore)) {
+            throw "debug.keystore not found: $debugKeystore"
+          }
+
+          $buildToolsRoot = Join-Path $env:LOCALAPPDATA "Android\Sdk\build-tools"
+          $apksigner = Get-ChildItem $buildToolsRoot -Directory |
+            Sort-Object Name -Descending |
+            ForEach-Object { Join-Path $_.FullName "apksigner.bat" } |
+            Where-Object { Test-Path $_ } |
+            Select-Object -First 1
+
+          if (-not $apksigner) {
+            throw "apksigner.bat not found under $buildToolsRoot"
+          }
+
+          $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+          $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+
+          & $apksigner sign `
+            --ks $debugKeystore `
+            --ks-key-alias androiddebugkey `
+            --ks-pass pass:android `
+            --key-pass pass:android `
+            --v1-signing-enabled true `
+            --v2-signing-enabled true `
+            --v3-signing-enabled true `
+            $apkPath
+
+      - name: Verify APK signature
+        if: ${{ success() }}
+        shell: powershell
+        run: |
+          $apkPath = "C:\actions-artifacts\current\$env:APK_NAME"
+
+          $buildToolsRoot = Join-Path $env:LOCALAPPDATA "Android\Sdk\build-tools"
+          $apksigner = Get-ChildItem $buildToolsRoot -Directory |
+            Sort-Object Name -Descending |
+            ForEach-Object { Join-Path $_.FullName "apksigner.bat" } |
+            Where-Object { Test-Path $_ } |
+            Select-Object -First 1
+
+          if (-not $apksigner) {
+            throw "apksigner.bat not found under $buildToolsRoot"
+          }
+
+          $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+          $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+
+          & $apksigner verify --verbose $apkPath
 
       - name: Show artifact files
         if: ${{ always() }}
