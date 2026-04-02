@@ -44,25 +44,9 @@ jobs:
       - name: Checkout Mapper branch
         shell: powershell
         run: |
-          $cmd = @'
-          set -eu
-          MAPPER_REPO=~/src/mapper
-          TARGET_REF="${{ inputs.mapper_ref }}"
-
-          cd "$MAPPER_REPO"
-          git fetch origin --prune
-
-          if git show-ref --verify --quiet "refs/heads/$TARGET_REF"; then
-            git checkout "$TARGET_REF"
-            git pull --ff-only origin "$TARGET_REF"
-          else
-            git checkout -B "$TARGET_REF" "origin/$TARGET_REF"
-          fi
-
-          git rev-parse --abbrev-ref HEAD
-          git rev-parse --short HEAD
-          '@
-          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "$cmd"
+          $targetRef = "${{ inputs.mapper_ref }}"
+          $cmd = 'set -eu; MAPPER_REPO=~/src/mapper; TARGET_REF="' + $targetRef + '"; cd "$MAPPER_REPO"; git fetch origin --prune; if git show-ref --verify --quiet "refs/heads/$TARGET_REF"; then git checkout "$TARGET_REF"; git pull --ff-only origin "$TARGET_REF"; else git checkout -B "$TARGET_REF" "origin/$TARGET_REF"; fi; git rev-parse --abbrev-ref HEAD; git rev-parse --short HEAD'
+          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c $cmd
 
       - name: Run OOM Android build
         shell: powershell
