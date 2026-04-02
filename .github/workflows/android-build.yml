@@ -14,6 +14,16 @@ jobs:
           New-Item -ItemType Directory -Force -Path C:\actions-artifacts\current | Out-Null
           Remove-Item -Force C:\actions-artifacts\current\* -ErrorAction SilentlyContinue
 
+      - name: Set build metadata
+        shell: powershell
+        run: |
+          $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+          $shortSha = $env:GITHUB_SHA.Substring(0,7)
+          "BUILD_STAMP=$stamp" >> $env:GITHUB_ENV
+          "SHORT_SHA=$shortSha" >> $env:GITHUB_ENV
+          "APK_NAME=OOM-Android-$stamp-$shortSha.apk" >> $env:GITHUB_ENV
+          "LOG_NAME=OOM-Android-$stamp-$shortSha-build.log" >> $env:GITHUB_ENV
+
       - name: Show environment
         shell: powershell
         run: |
@@ -29,19 +39,33 @@ jobs:
         run: |
           wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "cd ~/src/oom-build-tools && ./oom-run.sh > /mnt/c/actions-artifacts/current/build.log 2>&1"
 
+      - name: Rename build log
+        if: ${{ always() }}
+        shell: powershell
+        run: |
+          if (Test-Path C:\actions-artifacts\current\build.log) {
+            Rename-Item -Path C:\actions-artifacts\current\build.log -NewName $env:LOG_NAME -Force
+          }
+
       - name: Copy APK to artifact folder
         if: ${{ success() }}
         shell: powershell
         run: |
-          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "cp -f /home/yutaro/src/superbuild/build-android/aarch64-linux-android/openorienteering-mapper-git-master/OpenOrienteering-Mapper-git-master-Android-arm64-v8a.apk /mnt/c/actions-artifacts/current/"
+          wsl.exe -d Ubuntu --exec /usr/bin/env -i HOME=/home/yutaro USER=yutaro PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --noprofile --norc -c "cp -f /home/yutaro/src/superbuild/build-android/aarch64-linux-android/openorienteering-mapper-git-master/OpenOrienteering-Mapper-git-master-Android-arm64-v8a.apk /mnt/c/actions-artifacts/current/$env:APK_NAME"
+
+      - name: Show artifact files
+        if: ${{ always() }}
+        shell: powershell
+        run: |
+          Get-ChildItem C:\actions-artifacts\current
 
       - name: Upload APK and log
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: oom-android-apk
+          name: oom-android-apk-${{ env.BUILD_STAMP }}-${{ env.SHORT_SHA }}
           path: |
             C:\actions-artifacts\current\*.apk
-            C:\actions-artifacts\current\build.log
+            C:\actions-artifacts\current\*.log
           if-no-files-found: warn
           retention-days: 14
